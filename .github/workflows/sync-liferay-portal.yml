@@ -1,0 +1,14 @@
+name: Sync liferay-portal fork
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 * * * *" 
+
+jobs:
+  sync_liferay_portal:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh repo sync --force jorgediaz-lr/liferay-portal --source liferay/liferay-portal --branch master
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
