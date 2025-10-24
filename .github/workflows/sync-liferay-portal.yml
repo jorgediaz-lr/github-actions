@@ -30,7 +30,7 @@ jobs:
           git pull origin master
           ../github-actions/scripts/changes.sh "$SHA" > changes.txt
           if grep -q "Changes" changes.txt; then
-            gh issue create --title "Changes" --body "$(cat changes.txt)" --repo liferay-database-infra/liferay-portal
+            gh issue create --title "Changes" --body "$(cat changes.txt)" --repo jorgediaz-lr/liferay-portal
           fi
         env:
           GH_TOKEN: ${{ secrets.PAT }}
