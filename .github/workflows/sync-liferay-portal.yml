@@ -9,6 +9,28 @@ jobs:
   sync_liferay_portal:
     runs-on: ubuntu-latest
     steps:
-      - run: gh repo sync --force jorgediaz-lr/liferay-portal --source liferay/liferay-portal --branch master
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ github.repository }}
+          path: github-actions
+
+      - name: Checkout jorgediaz-lr/liferay-portal
+        uses: actions/checkout@v3
+        with:
+          repository: 'jorgediaz-lr/liferay-portal'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: liferay-portal
+
+      - name: Sync and find changes
+        run: |
+          cd liferay-portal
+          SHA=$(git rev-parse HEAD)
+          gh repo sync jorgediaz-lr/liferay-portal --source liferay/liferay-portal --branch master
+          git pull origin master
+          ../github-actions/scripts/changes.sh "$SHA" > changes.txt
+          if grep -q "Changes" changes.txt; then
+            gh issue create --title "Changes" --body "$(cat changes.txt)" --repo liferay-database-infra/liferay-portal
+          fi
         env:
           GH_TOKEN: ${{ secrets.PAT }}
