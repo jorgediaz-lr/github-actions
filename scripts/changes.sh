@@ -51,6 +51,32 @@ section() {
     echo ""
 }
 
+JIRA_FUNCTIONS='
+    function jira(text,    key, out, ticket) {
+        ticket = jira_projects
+        gsub(/ /, "|", ticket)
+        ticket = "(" ticket ")-[0-9]+"
+        out = ""
+        while (match(text, ticket)) {
+            key = substr(text, RSTART, RLENGTH)
+            out = out substr(text, 1, RSTART - 1) "[" key "](" jira_url key ")"
+            text = substr(text, RSTART + RLENGTH)
+        }
+        return out text
+    }
+'
+
+# The sections keep plain "sha - email - subject" lines, because the listed
+# commits and the title are read from them, so the tickets are linked only when
+# the sections are printed.
+
+link_tickets() {
+    awk -v jira_projects="$JIRA_PROJECTS" -v jira_url="$JIRA_URL" "$JIRA_FUNCTIONS"'
+        $2 == "-" { $0 = jira($0) }
+        { print }
+    ' "$@"
+}
+
 grep '@liferay-database-infra' .github/CODEOWNERS | awk '{print $1}' | while read -r folder; do
     commits=$(git log "$BASE..HEAD" --pretty=format:"$COMMIT_FORMAT" -- "$folder")
     if [ -n "$commits" ]; then
@@ -195,12 +221,9 @@ find_pull_requests() {
         fi
     done
 
-    awk -F'\t' -v brian="$BRIAN_EMAIL" -v jira_projects="$JIRA_PROJECTS" -v jira_url="$JIRA_URL" -v members="$TEAM_MEMBERS" -v regen_subject="$REGEN_SUBJECT" -v release_subjects="$RELEASE_SUBJECTS" -v repository="$PULL_REQUEST_REPOSITORY" -v team="$TEAM_REPOSITORY" '
+    awk -F'\t' -v brian="$BRIAN_EMAIL" -v jira_projects="$JIRA_PROJECTS" -v jira_url="$JIRA_URL" -v members="$TEAM_MEMBERS" -v regen_subject="$REGEN_SUBJECT" -v release_subjects="$RELEASE_SUBJECTS" -v repository="$PULL_REQUEST_REPOSITORY" -v team="$TEAM_REPOSITORY" "$JIRA_FUNCTIONS"'
         BEGIN {
             split("✅ ⚠️ 🚨 🤔 ❌ ❔ 📦", marks, " ")
-            ticket = jira_projects
-            gsub(/ /, "|", ticket)
-            ticket = "(" ticket ")-[0-9]+"
             split(tolower(members), names, " ")
             for (i = 1; i in names; i++) { member[names[i]] = 1 }
             meaning["✅"] = "forwarded from " substr(team, 1, index(team, "/") - 1)
@@ -216,15 +239,6 @@ find_pull_requests() {
             gsub(/</, "\\&lt;", text)
             gsub(/@/, "@\342\200\213", text)
             return text
-        }
-        function jira(text,    key, out) {
-            out = ""
-            while (match(text, ticket)) {
-                key = substr(text, RSTART, RLENGTH)
-                out = out substr(text, 1, RSTART - 1) "[" key "](" jira_url key ")"
-                text = substr(text, RSTART + RLENGTH)
-            }
-            return out text
         }
         function link(reference,    parts) {
             split(reference, parts, /[\/#]/)
@@ -339,14 +353,14 @@ if [ -s "$LISTED_COMMITS" ]; then
     find_pull_requests
 fi
 
-cat "$THREAD_LOCAL_SECTIONS"
+link_tickets "$THREAD_LOCAL_SECTIONS"
 
 if [ -s "$THREAD_LOCAL_SECTIONS" ] && [ -s "$FOLDER_SECTIONS" ]; then
     echo "---"
     echo ""
 fi
 
-cat "$FOLDER_SECTIONS"
+link_tickets "$FOLDER_SECTIONS"
 
 if [ -n "$TITLE_FILE" ]; then
     write_title > "$TITLE_FILE"
